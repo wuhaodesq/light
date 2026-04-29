@@ -5,16 +5,10 @@ use crate::ast::{Expr, Function, Program, Stmt};
 use crate::diagnostics::{Diagnostic, DiagnosticCode, Span};
 
 pub fn build_program(program: &Program, target: String, no_std: bool) -> Result<(), Diagnostic> {
-    if no_std && target.ends_with("-linux") {
-        return Err(Diagnostic::new(
-            DiagnosticCode::RuntimeError,
-            "--no-std is only valid for bare-metal targets",
-            Span::new(0, 0),
-        ));
-    }
+    validate_target(&target, no_std)?;
 
     let ir = lower_to_ir(program);
-    let out_dir = PathBuf::from("build");
+    let out_dir = PathBuf::from("build").join(&target);
     fs::create_dir_all(&out_dir).map_err(|e| {
         Diagnostic::new(DiagnosticCode::RuntimeError, e.to_string(), Span::new(0, 0))
     })?;
@@ -52,6 +46,26 @@ pub fn supported_targets() -> &'static [&'static str] {
         "riscv32imac-none-elf",
         "esp32-none-elf",
     ]
+}
+
+fn validate_target(target: &str, no_std: bool) -> Result<(), Diagnostic> {
+    if !supported_targets().contains(&target) {
+        return Err(Diagnostic::new(
+            DiagnosticCode::RuntimeError,
+            format!("unsupported target `{target}`"),
+            Span::new(0, 0),
+        ));
+    }
+
+    if no_std && target.ends_with("-linux") {
+        return Err(Diagnostic::new(
+            DiagnosticCode::RuntimeError,
+            "--no-std is only valid for bare-metal targets",
+            Span::new(0, 0),
+        ));
+    }
+
+    Ok(())
 }
 
 fn program_entry(program: &Program) -> Option<&str> {
