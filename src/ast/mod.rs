@@ -25,9 +25,16 @@ pub enum Stmt {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct Param {
+    pub name: String,
+    pub ty: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct Function {
     pub name: String,
-    pub params: Vec<String>,
+    pub params: Vec<Param>,
+    pub return_type: Option<String>,
     pub body: Vec<Stmt>,
 }
 

@@ -20,6 +20,7 @@ pub enum Token {
     LBrace,
     RBrace,
     Comma,
+    Colon,
     Arrow,
     Newline,
     Eof,
@@ -56,6 +57,7 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
             '{' => Token::LBrace,
             '}' => Token::RBrace,
             ',' => Token::Comma,
+            ':' => Token::Colon,
             '"' => {
                 let mut content = String::new();
                 let mut end = idx;

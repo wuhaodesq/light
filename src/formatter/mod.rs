@@ -6,7 +6,22 @@ pub fn format_source(source: &str) -> Result<String, Diagnostic> {
     let mut output = String::new();
 
     for function in program.functions {
-        output.push_str(&format!("fn {}() {{\n", function.name));
+        let params = function
+            .params
+            .iter()
+            .map(|p| match &p.ty {
+                Some(ty) => format!("{}: {}", p.name, ty),
+                None => p.name.clone(),
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        output.push_str(&format!("fn {}({})", function.name, params));
+        if let Some(ret) = function.return_type {
+            output.push_str(&format!(" -> {ret}"));
+        }
+        output.push_str(" {\n");
+
         for stmt in function.body {
             output.push_str("    ");
             output.push_str(&format_stmt(&stmt));

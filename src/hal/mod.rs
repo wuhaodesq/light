@@ -1,8 +1,9 @@
 use std::path::Path;
 
+use crate::ast::Program;
 use crate::diagnostics::{Diagnostic, DiagnosticCode, Span};
 
-pub fn build_firmware(target: &str) -> Result<(), Diagnostic> {
+pub fn build_firmware(program: &Program, target: &str) -> Result<(), Diagnostic> {
     if !crate::backend::supported_targets().contains(&target) {
         return Err(Diagnostic::new(
             DiagnosticCode::RuntimeError,
@@ -11,7 +12,7 @@ pub fn build_firmware(target: &str) -> Result<(), Diagnostic> {
         ));
     }
 
-    println!("firmware build ok for {target}");
+    crate::backend::build_program(program, target.to_string(), true)?;
     println!("build/firmware/main.elf");
     println!("build/firmware/main.bin");
     println!("build/firmware/main.hex");

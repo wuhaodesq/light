@@ -1,5 +1,5 @@
-use crate::ast::{BinaryOp, Expr, Function, Program, Stmt};
-use crate::diagnostics::{Diagnostic, DiagnosticCode, Span};
+use crate::ast::{BinaryOp, Expr, Function, Param, Program, Stmt};
+use crate::diagnostics::{Diagnostic, DiagnosticCode};
 use crate::lexer::{Token, TokenWithSpan};
 
 pub fn parse(tokens: Vec<TokenWithSpan>) -> Result<Program, Diagnostic> {
@@ -32,7 +32,16 @@ impl Parser {
         self.expect(Token::Fn, "expected `fn`")?;
         let name = self.expect_identifier("expected function name")?;
         self.expect(Token::LParen, "expected `(`")?;
+        let params = self.parse_params()?;
         self.expect(Token::RParen, "expected `)`")?;
+
+        let return_type = if self.check(&Token::Arrow) {
+            self.advance();
+            Some(self.expect_identifier("expected return type after `->`")?)
+        } else {
+            None
+        };
+
         self.expect(Token::LBrace, "expected `{`")?;
         self.skip_newlines();
 
@@ -45,9 +54,36 @@ impl Parser {
         self.expect(Token::RBrace, "expected `}`")?;
         Ok(Function {
             name,
-            params: Vec::new(),
+            params,
+            return_type,
             body,
         })
+    }
+
+    fn parse_params(&mut self) -> Result<Vec<Param>, Diagnostic> {
+        let mut params = Vec::new();
+        if self.check(&Token::RParen) {
+            return Ok(params);
+        }
+
+        loop {
+            let name = self.expect_identifier("expected parameter name")?;
+            let ty = if self.check(&Token::Colon) {
+                self.advance();
+                Some(self.expect_identifier("expected parameter type")?)
+            } else {
+                None
+            };
+            params.push(Param { name, ty });
+
+            if self.check(&Token::Comma) {
+                self.advance();
+                continue;
+            }
+            break;
+        }
+
+        Ok(params)
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, Diagnostic> {

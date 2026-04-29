@@ -11,34 +11,55 @@ enum Value {
 }
 
 pub fn run(program: &Program) -> Result<(), Diagnostic> {
-    let main = program
-        .functions
-        .iter()
-        .find(|f| f.name == "main")
-        .ok_or_else(|| {
-            Diagnostic::new(
-                DiagnosticCode::RuntimeError,
-                "missing entry function `main`",
-                Span::new(0, 0),
-            )
-        })?;
+    let mut functions = HashMap::new();
+    for function in &program.functions {
+        functions.insert(function.name.as_str(), function);
+    }
 
-    eval_function(main)?;
+    let main = functions.get("main").copied().ok_or_else(|| {
+        Diagnostic::new(
+            DiagnosticCode::RuntimeError,
+            "missing entry function `main`",
+            Span::new(0, 0),
+        )
+    })?;
+
+    let _ = eval_function(main, Vec::new(), &functions)?;
     Ok(())
 }
 
-fn eval_function(function: &Function) -> Result<Value, Diagnostic> {
+fn eval_function<'a>(
+    function: &'a Function,
+    args: Vec<Value>,
+    functions: &HashMap<&'a str, &'a Function>,
+) -> Result<Value, Diagnostic> {
+    if function.params.len() != args.len() {
+        return Err(Diagnostic::new(
+            DiagnosticCode::RuntimeError,
+            format!(
+                "function `{}` expects {} arguments but got {}",
+                function.name,
+                function.params.len(),
+                args.len()
+            ),
+            Span::new(0, 0),
+        ));
+    }
+
     let mut env: HashMap<String, Value> = HashMap::new();
+    for (param, arg) in function.params.iter().zip(args.into_iter()) {
+        env.insert(param.name.clone(), arg);
+    }
 
     for stmt in &function.body {
         match stmt {
             Stmt::Let(name, expr) => {
-                let value = eval_expr(expr, &mut env)?;
+                let value = eval_expr(expr, &mut env, functions)?;
                 env.insert(name.clone(), value);
             }
-            Stmt::Return(expr) => return eval_expr(expr, &mut env),
+            Stmt::Return(expr) => return eval_expr(expr, &mut env, functions),
             Stmt::Expr(expr) => {
-                let _ = eval_expr(expr, &mut env)?;
+                let _ = eval_expr(expr, &mut env, functions)?;
             }
         }
     }
@@ -46,7 +67,11 @@ fn eval_function(function: &Function) -> Result<Value, Diagnostic> {
     Ok(Value::Unit)
 }
 
-fn eval_expr(expr: &Expr, env: &mut HashMap<String, Value>) -> Result<Value, Diagnostic> {
+fn eval_expr<'a>(
+    expr: &Expr,
+    env: &mut HashMap<String, Value>,
+    functions: &HashMap<&'a str, &'a Function>,
+) -> Result<Value, Diagnostic> {
     match expr {
         Expr::Number(value) => Ok(Value::Number(*value)),
         Expr::String(value) => Ok(Value::String(value.clone())),
@@ -58,15 +83,15 @@ fn eval_expr(expr: &Expr, env: &mut HashMap<String, Value>) -> Result<Value, Dia
             )
         }),
         Expr::Binary(lhs, op, rhs) => {
-            let lhs = eval_expr(lhs, env)?;
-            let rhs = eval_expr(rhs, env)?;
+            let lhs = eval_expr(lhs, env, functions)?;
+            let rhs = eval_expr(rhs, env, functions)?;
             eval_binary(lhs, op, rhs)
         }
         Expr::Call { callee, args } => {
             if callee == "print" {
                 let mut out = String::new();
                 for arg in args {
-                    let value = eval_expr(arg, env)?;
+                    let value = eval_expr(arg, env, functions)?;
                     let rendered = match value {
                         Value::Number(v) => v.to_string(),
                         Value::String(v) => v,
@@ -80,11 +105,19 @@ fn eval_expr(expr: &Expr, env: &mut HashMap<String, Value>) -> Result<Value, Dia
                 println!("{out}");
                 Ok(Value::Unit)
             } else {
-                Err(Diagnostic::new(
-                    DiagnosticCode::RuntimeError,
-                    format!("unknown function `{callee}`"),
-                    Span::new(0, 0),
-                ))
+                let function = functions.get(callee.as_str()).copied().ok_or_else(|| {
+                    Diagnostic::new(
+                        DiagnosticCode::RuntimeError,
+                        format!("unknown function `{callee}`"),
+                        Span::new(0, 0),
+                    )
+                })?;
+
+                let mut values = Vec::with_capacity(args.len());
+                for arg in args {
+                    values.push(eval_expr(arg, env, functions)?);
+                }
+                eval_function(function, values, functions)
             }
         }
     }

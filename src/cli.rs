@@ -117,13 +117,19 @@ pub fn run() -> Result<(), Diagnostic> {
             target,
             no_std,
         } => {
-            let _ = crate::utils::load_program(&file)?;
-            crate::backend::build(target.unwrap_or_else(|| "x86_64-linux".to_string()), no_std)
+            let program = crate::utils::load_program(&file)?;
+            crate::semantic::analyze(&program)?;
+            crate::backend::build_program(
+                &program,
+                target.unwrap_or_else(|| "x86_64-linux".to_string()),
+                no_std,
+            )
         }
         Commands::Firmware { command } => match command {
             FirmwareCommands::Build { file, target } => {
-                let _ = crate::utils::load_program(&file)?;
-                crate::hal::build_firmware(&target)
+                let program = crate::utils::load_program(&file)?;
+                crate::semantic::analyze(&program)?;
+                crate::hal::build_firmware(&program, &target)
             }
         },
         Commands::Flash {
