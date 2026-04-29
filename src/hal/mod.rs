@@ -1,3 +1,4 @@
+use std::fs;
 use std::path::Path;
 
 use crate::ast::Program;
@@ -13,6 +14,20 @@ pub fn build_firmware(program: &Program, target: &str) -> Result<(), Diagnostic>
     }
 
     crate::backend::build_program(program, target.to_string(), true)?;
+
+    fs::create_dir_all("build/firmware").map_err(|e| {
+        Diagnostic::new(DiagnosticCode::RuntimeError, e.to_string(), Span::new(0, 0))
+    })?;
+    fs::copy("build/main.elf", "build/firmware/main.elf").map_err(|e| {
+        Diagnostic::new(DiagnosticCode::RuntimeError, e.to_string(), Span::new(0, 0))
+    })?;
+    fs::copy("build/main.bin", "build/firmware/main.bin").map_err(|e| {
+        Diagnostic::new(DiagnosticCode::RuntimeError, e.to_string(), Span::new(0, 0))
+    })?;
+    fs::copy("build/main.hex", "build/firmware/main.hex").map_err(|e| {
+        Diagnostic::new(DiagnosticCode::RuntimeError, e.to_string(), Span::new(0, 0))
+    })?;
+
     println!("build/firmware/main.elf");
     println!("build/firmware/main.bin");
     println!("build/firmware/main.hex");

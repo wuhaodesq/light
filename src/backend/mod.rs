@@ -1,3 +1,6 @@
+use std::fs;
+use std::path::PathBuf;
+
 use crate::ast::{Expr, Function, Program, Stmt};
 use crate::diagnostics::{Diagnostic, DiagnosticCode, Span};
 
@@ -11,9 +14,31 @@ pub fn build_program(program: &Program, target: String, no_std: bool) -> Result<
     }
 
     let ir = lower_to_ir(program);
+    let out_dir = PathBuf::from("build");
+    fs::create_dir_all(&out_dir).map_err(|e| {
+        Diagnostic::new(DiagnosticCode::RuntimeError, e.to_string(), Span::new(0, 0))
+    })?;
+
+    let stem = program_entry(program).unwrap_or("main");
+    let elf_path = out_dir.join(format!("{stem}.elf"));
+    let bin_path = out_dir.join(format!("{stem}.bin"));
+    let hex_path = out_dir.join(format!("{stem}.hex"));
+
+    let elf_content = format!("; target={target}\n; no_std={no_std}\n{ir}");
+    fs::write(&elf_path, elf_content).map_err(|e| {
+        Diagnostic::new(DiagnosticCode::RuntimeError, e.to_string(), Span::new(0, 0))
+    })?;
+    fs::write(&bin_path, b"LIGHT-BIN\n").map_err(|e| {
+        Diagnostic::new(DiagnosticCode::RuntimeError, e.to_string(), Span::new(0, 0))
+    })?;
+    fs::write(&hex_path, b":4C494748540A\n").map_err(|e| {
+        Diagnostic::new(DiagnosticCode::RuntimeError, e.to_string(), Span::new(0, 0))
+    })?;
+
     println!("build ok, target={target}, no_std={no_std}");
-    println!("; light-ir");
-    println!("{ir}");
+    println!("{}", elf_path.display());
+    println!("{}", bin_path.display());
+    println!("{}", hex_path.display());
     Ok(())
 }
 
@@ -27,6 +52,15 @@ pub fn supported_targets() -> &'static [&'static str] {
         "riscv32imac-none-elf",
         "esp32-none-elf",
     ]
+}
+
+fn program_entry(program: &Program) -> Option<&str> {
+    program
+        .functions
+        .iter()
+        .find(|f| f.name == "main")
+        .map(|f| f.name.as_str())
+        .or_else(|| program.functions.first().map(|f| f.name.as_str()))
 }
 
 fn lower_to_ir(program: &Program) -> String {
