@@ -1,0 +1,4 @@
+fn main() {
+    let confidence = 0.98
+    print("detected", confidence)
+}
