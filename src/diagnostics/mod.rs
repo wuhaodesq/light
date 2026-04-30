@@ -69,15 +69,15 @@ impl Span {
                 result.push_str(line);
                 result.push('\n');
                 result.push_str(&" ".repeat(start_col.saturating_sub(1)));
-                result.push_str(&"^".repeat(line.len().saturating_sub(start_col)));
+                result.push_str(&"^".repeat(line.len().saturating_sub(start_col - 1)));
             }
-            for line_num in start_line..end_line {
-                if let Some(line) = lines.get(line_num) {
+            for line_num in (start_line + 1)..end_line {
+                if let Some(line) = lines.get(line_num - 1) {
                     result.push('\n');
                     result.push_str(line);
                 }
             }
-            if let Some(line) = lines.get(end_line.saturating_sub(1)) {
+            if let Some(line) = lines.get(end_line - 1) {
                 result.push('\n');
                 result.push_str(&"^".repeat(end_col.min(line.len())));
             }
