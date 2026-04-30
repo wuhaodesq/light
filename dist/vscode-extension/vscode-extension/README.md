@@ -10,19 +10,6 @@
 - Number highlighting
 - Operator highlighting
 
-## Adding an Icon
-
-The extension icon must be a **PNG** file (128x128 or 256x256 recommended).
-
-1. Create or obtain a 256x256 PNG icon named `icon.png`
-2. Place it in the `vscode-extension/` folder
-3. Add to `package.json`:
-   ```json
-   "icon": "./icon.png"
-   ```
-
-You can use online tools to convert SVG to PNG, or design your own icon.
-
 ## Installation
 
 ### From Source
@@ -35,8 +22,7 @@ Or use VS Code's "Install from VSIX" command.
 ### Build .vsix Package
 
 ```bash
-npm install -g @vscode/vsce
-cd vscode-extension
+npm install -g vsce
 vsce package
 ```
 

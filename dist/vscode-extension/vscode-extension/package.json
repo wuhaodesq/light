@@ -4,7 +4,7 @@
   "description": "Language support for Light programming language",
   "version": "0.1.0",
   "publisher": "light-lang",
-  "icon": "./icon.png",
+  "icon": "./icon.svg",
   "engines": {
     "vscode": "^1.75.0"
   },
@@ -25,6 +25,13 @@
         "language": "light",
         "scopeName": "source.light",
         "path": "./syntaxes/light.tmLanguage.json"
+      }
+    ],
+    "iconThemes": [
+      {
+        "id": "light-icons",
+        "label": "Light Language Icons",
+        "path": "./icon.svg"
       }
     ]
   }
