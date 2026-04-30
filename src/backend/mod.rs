@@ -257,6 +257,20 @@ fn lower_stmt(stmt: &Stmt) -> String {
         Stmt::Return(expr) => format!("ret {}", lower_expr(expr)),
         Stmt::Expr(expr) => lower_expr(expr),
         Stmt::Use(use_stmt) => format!("use {}", use_stmt.path),
+        Stmt::StructDef { name, fields } => {
+            let fields_str = fields.iter().map(|(n, t)| format!("{n}: {t}")).collect::<Vec<_>>().join(", ");
+            format!("struct {} {{ {fields_str} }}", name)
+        }
+        Stmt::EnumDef { name, variants } => {
+            let variants_str = variants.iter().map(|(n, ts)| {
+                if ts.is_empty() {
+                    n.clone()
+                } else {
+                    format!("{}({})", n, ts.join(", "))
+                }
+            }).collect::<Vec<_>>().join(", ");
+            format!("enum {} {{ {} }}", name, variants_str)
+        }
         Stmt::If { condition, then_block, else_block } => {
             let mut out = format!("if {} {{\n", lower_expr(condition));
             for s in then_block {
@@ -313,6 +327,33 @@ fn lower_expr(expr: &Expr) -> String {
         }
         Expr::ArrayIndex(arr, index) => {
             format!("index({}, {})", lower_expr(arr), lower_expr(index))
+        }
+        Expr::StructInit { name, fields } => {
+            let fields_str = fields.iter().map(|(n, e)| format!("{n}: {}", lower_expr(e))).collect::<Vec<_>>().join(", ");
+            format!("{name} {{ {fields_str} }}")
+        }
+        Expr::FieldAccess(expr, field) => {
+            format!("{}.{}", lower_expr(expr), field)
+        }
+        Expr::Match { expr, cases } => {
+            let expr_str = lower_expr(expr);
+            let cases_str = cases.iter().map(|c| {
+                let pattern_str = match &c.pattern {
+                    crate::ast::MatchPattern::Wildcard => "_".to_string(),
+                    crate::ast::MatchPattern::Number(n) => n.to_string(),
+                    crate::ast::MatchPattern::String(s) => format!("\"{s}\""),
+                    crate::ast::MatchPattern::Identifier(i) => i.clone(),
+                    crate::ast::MatchPattern::EnumVariant { name, patterns, .. } => {
+                        if patterns.is_empty() {
+                            name.clone()
+                        } else {
+                            format!("{}({})", name, patterns.iter().map(|p| "?".to_string()).collect::<Vec<_>>().join(", "))
+                        }
+                    }
+                };
+                format!("{pattern_str} -> {body}", body = lower_expr(&c.body))
+            }).collect::<Vec<_>>().join(", ");
+            format!("match {expr_str} {{ {cases_str} }}")
         }
         Expr::Binary(lhs, op, rhs) => {
             let op = match op {

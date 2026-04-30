@@ -48,6 +48,20 @@ fn format_stmt(stmt: &crate::ast::Stmt) -> String {
         crate::ast::Stmt::Return(expr) => format!("return {}", format_expr(expr)),
         crate::ast::Stmt::Expr(expr) => format_expr(expr),
         crate::ast::Stmt::Use(use_stmt) => format!("use {}", use_stmt.path),
+        crate::ast::Stmt::StructDef { name, fields } => {
+            let fields_str = fields.iter().map(|(n, t)| format!("{n}: {t}")).collect::<Vec<_>>().join(", ");
+            format!("struct {name} {{ {fields_str} }}")
+        }
+        crate::ast::Stmt::EnumDef { name, variants } => {
+            let variants_str = variants.iter().map(|(n, ts)| {
+                if ts.is_empty() {
+                    n.clone()
+                } else {
+                    format!("{}({})", n, ts.join(", "))
+                }
+            }).collect::<Vec<_>>().join(", ");
+            format!("enum {name} {{ {variants_str} }}")
+        }
         crate::ast::Stmt::If { condition, then_block, else_block } => {
             let mut out = format!("if {} {{\n", format_expr(condition));
             for s in then_block {
@@ -110,6 +124,13 @@ fn format_expr(expr: &crate::ast::Expr) -> String {
         crate::ast::Expr::ArrayIndex(arr, index) => {
             format!("{}[{}]", format_expr(arr), format_expr(index))
         }
+        crate::ast::Expr::StructInit { name, fields } => {
+            let fields_str = fields.iter().map(|(n, e)| format!("{n}: {}", format_expr(e))).collect::<Vec<_>>().join(", ");
+            format!("{name} {{ {fields_str} }}")
+        }
+        crate::ast::Expr::FieldAccess(expr, field) => {
+            format!("{}.{}", format_expr(expr), field)
+        }
         crate::ast::Expr::Binary(lhs, op, rhs) => format!(
             "{} {} {}",
             format_expr(lhs),
@@ -130,6 +151,26 @@ fn format_expr(expr: &crate::ast::Expr) -> String {
         crate::ast::Expr::Call { callee, args } => {
             let args = args.iter().map(format_expr).collect::<Vec<_>>().join(", ");
             format!("{callee}({args})")
+        }
+        crate::ast::Expr::Match { expr, cases } => {
+            let expr_str = format_expr(expr);
+            let cases_str = cases.iter().map(|c| {
+                let pattern_str = match &c.pattern {
+                    crate::ast::MatchPattern::Wildcard => "_".to_string(),
+                    crate::ast::MatchPattern::Number(n) => n.to_string(),
+                    crate::ast::MatchPattern::String(s) => format!("\"{s}\""),
+                    crate::ast::MatchPattern::Identifier(i) => i.clone(),
+                    crate::ast::MatchPattern::EnumVariant { name, patterns, .. } => {
+                        if patterns.is_empty() {
+                            name.clone()
+                        } else {
+                            format!("{}({})", name, patterns.iter().map(|_| "_".to_string()).collect::<Vec<_>>().join(", "))
+                        }
+                    }
+                };
+                format!("{pattern_str} -> {}", format_expr(&c.body))
+            }).collect::<Vec<_>>().join(", ");
+            format!("match {expr_str} {{ {cases_str} }}")
         }
     }
 }

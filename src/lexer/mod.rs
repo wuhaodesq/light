@@ -10,6 +10,10 @@ pub enum Token {
     While,
     For,
     Use,
+    Struct,
+    Enum,
+    Match,
+    Underscore,
     Identifier(String),
     Number(f64),
     String(String),
@@ -24,6 +28,7 @@ pub enum Token {
     LessEqual,
     Greater,
     GreaterEqual,
+    ColonColon,
     LParen,
     RParen,
     LBracket,
@@ -147,7 +152,14 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
             '}' => Token::RBrace,
             ',' => Token::Comma,
             ';' => Token::Semicolon,
-            ':' => Token::Colon,
+            ':' => {
+                if let Some((_, ':')) = chars.peek() {
+                    chars.next();
+                    Token::ColonColon
+                } else {
+                    Token::Colon
+                }
+            }
             '.' => Token::Dot,
             '"' => {
                 let start = idx;
@@ -241,6 +253,9 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
                     "while" => Token::While,
                     "for" => Token::For,
                     "use" => Token::Use,
+                    "struct" => Token::Struct,
+                    "enum" => Token::Enum,
+                    "match" => Token::Match,
                     _ => Token::Identifier(ident),
                 };
                 tokens.push(TokenWithSpan {

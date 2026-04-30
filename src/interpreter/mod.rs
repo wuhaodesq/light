@@ -10,6 +10,8 @@ enum Value {
     Unit,
     GpioPin(u32),
     Array(Vec<Value>),
+    Struct(HashMap<String, Value>),
+    Enum(String, String),
 }
 
 pub fn run(program: &Program) -> Result<(), Diagnostic> {
@@ -69,6 +71,7 @@ fn eval_function<'a>(
                 let _ = eval_expr(expr, &mut env, functions, uses)?;
             }
             Stmt::Use(_) => {}
+            Stmt::StructDef { .. } | Stmt::EnumDef { .. } => {}
             Stmt::If { condition, then_block, else_block } => {
                 let cond = eval_expr(condition, &mut env, functions, uses)?;
                 let cond_truthy = is_truthy(&cond);
@@ -135,13 +138,28 @@ fn eval_expr<'a>(
     match expr {
         Expr::Number(value) => Ok(Value::Number(*value)),
         Expr::String(value) => Ok(Value::String(value.clone())),
-        Expr::Identifier(name) => env.get(name).cloned().ok_or_else(|| {
-            Diagnostic::new(
-                DiagnosticCode::RuntimeError,
-                format!("unknown variable `{name}`"),
-                Span::new(0, 0),
-            )
-        }),
+        Expr::Identifier(name) => {
+            if let Some(value) = env.get(name).cloned() {
+                Ok(value)
+            } else if name.contains("::") {
+                let parts: Vec<&str> = name.split("::").collect();
+                if parts.len() == 2 {
+                    Ok(Value::Enum(parts[0].to_string(), parts[1].to_string()))
+                } else {
+                    Err(Diagnostic::new(
+                        DiagnosticCode::RuntimeError,
+                        format!("unknown variable `{name}`"),
+                        Span::new(0, 0),
+                    ))
+                }
+            } else {
+                Err(Diagnostic::new(
+                    DiagnosticCode::RuntimeError,
+                    format!("unknown variable `{name}`"),
+                    Span::new(0, 0),
+                ))
+            }
+        }
         Expr::Array(elements) => {
             let mut values = Vec::new();
             for elem in elements {
@@ -180,6 +198,56 @@ fn eval_expr<'a>(
                 )),
             }
         }
+        Expr::StructInit { name: _, fields } => {
+            let mut struct_values = HashMap::new();
+            for (field_name, field_expr) in fields {
+                let field_value = eval_expr(field_expr, env, functions, uses)?;
+                struct_values.insert(field_name.clone(), field_value);
+            }
+            Ok(Value::Struct(struct_values))
+        }
+        Expr::FieldAccess(expr, field) => {
+            let struct_val = eval_expr(expr, env, functions, uses)?;
+            match struct_val {
+                Value::Struct(fields) => {
+                    fields.get(field).cloned().ok_or_else(|| {
+                        Diagnostic::new(
+                            DiagnosticCode::RuntimeError,
+                            format!("unknown field `{field}`"),
+                            Span::new(0, 0),
+                        )
+                    })
+                }
+                _ => Err(Diagnostic::new(
+                    DiagnosticCode::RuntimeError,
+                    "cannot access field on non-struct value",
+                    Span::new(0, 0),
+                )),
+            }
+        }
+        Expr::Match { expr, cases } => {
+            let matched_value = eval_expr(expr, env, functions, uses)?;
+            for case in cases {
+                let matches = match (&matched_value, &case.pattern) {
+                    (Value::Number(n), crate::ast::MatchPattern::Number(p)) => (*n - p).abs() < f64::EPSILON,
+                    (Value::String(s), crate::ast::MatchPattern::String(p)) => s == p,
+                    (Value::Number(_), crate::ast::MatchPattern::Wildcard) => true,
+                    (Value::String(_), crate::ast::MatchPattern::Wildcard) => true,
+                    (Value::Enum(name, variant), crate::ast::MatchPattern::EnumVariant { name: pname, variant: pvariant, patterns }) => {
+                        name == pname && variant == pvariant && patterns.is_empty()
+                    }
+                    _ => false,
+                };
+                if matches {
+                    return eval_expr(&case.body, env, functions, uses);
+                }
+            }
+            Err(Diagnostic::new(
+                DiagnosticCode::RuntimeError,
+                "match expression exhausted without a match",
+                Span::new(0, 0),
+            ))
+        }
         Expr::Binary(lhs, op, rhs) => {
             let lhs = eval_expr(lhs, env, functions, uses)?;
             let rhs = eval_expr(rhs, env, functions, uses)?;
@@ -203,6 +271,11 @@ fn eval_expr<'a>(
                             let items: Vec<String> = arr.iter().map(|v| format!("{:?}", v)).collect();
                             format!("[{}]", items.join(", "))
                         }
+                        Value::Struct(fields) => {
+                            let items: Vec<String> = fields.iter().map(|(k, v)| format!("{k}: {:?}", v)).collect();
+                            format!("{{ {} }}", items.join(", "))
+                        }
+                        Value::Enum(name, variant) => format!("{}::{}", name, variant),
                     };
                     if !out.is_empty() {
                         out.push(' ');
@@ -291,6 +364,7 @@ fn eval_stmt<'a>(
             Ok(None)
         }
         Stmt::Use(_) => Ok(None),
+        Stmt::StructDef { .. } | Stmt::EnumDef { .. } => Ok(None),
         Stmt::If { condition, then_block, else_block } => {
             let cond = eval_expr(condition, env, functions, uses)?;
             let cond_truthy = is_truthy(&cond);
@@ -355,6 +429,8 @@ fn is_truthy(value: &Value) -> bool {
         Value::Unit => false,
         Value::GpioPin(_) => true,
         Value::Array(arr) => !arr.is_empty(),
+        Value::Struct(fields) => !fields.is_empty(),
+        Value::Enum(_, _) => true,
     }
 }
 
@@ -407,6 +483,17 @@ fn eval_binary(lhs: Value, op: &BinaryOp, rhs: Value) -> Result<Value, Diagnosti
                 _ => Err(Diagnostic::new(
                     DiagnosticCode::RuntimeError,
                     "comparison operators not supported for string/number",
+                    Span::new(0, 0),
+                )),
+            }
+        }
+        (Value::Enum(lhs_name, lhs_variant), Value::Enum(rhs_name, rhs_variant)) => {
+            match op {
+                BinaryOp::Equal => Ok(Value::Number(if lhs_name == rhs_name && lhs_variant == rhs_variant { 1.0 } else { 0.0 })),
+                BinaryOp::NotEqual => Ok(Value::Number(if lhs_name == rhs_name && lhs_variant == rhs_variant { 0.0 } else { 1.0 })),
+                _ => Err(Diagnostic::new(
+                    DiagnosticCode::RuntimeError,
+                    "comparison operators not supported for enums",
                     Span::new(0, 0),
                 )),
             }

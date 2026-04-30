@@ -27,6 +27,8 @@ This repository implements a custom programming language with support for AI and
 - **Arithmetic**: `+`, `-`, `*`, `/`
 - **Strings**: Concatenation (`+`), equality (`==`, `!=`)
 - **Arrays**: `let arr = [1, 2, 3]`, `arr[0]`
+- **Structs**: `struct Point { x: i32, y: i32 }`
+- **Enums**: `enum Color { Red, Green, Blue }`
 - **Comments**: `// single-line`, `/* multi-line */`
 - **HAL Builtins**: `gpio.pin()`, `sleep_ms()`, etc.
 - **Error Reporting**: Source spans with line:column location
@@ -147,8 +149,7 @@ A VS Code extension for Light language is available in `vscode-extension/`.
 
 The following features are planned but not yet implemented:
 
-- Custom structs/classes
-- Match/case expressions
+- Match/case expressions (structs/enums with qualified names)
 - Multi-file modules (beyond `use` statements)
 - Generic functions
 - Closures/anonymous functions
@@ -163,9 +164,10 @@ The following features are planned but not yet implemented:
 - [x] Arrays: `let arr = [1, 2, 3]`
 - [x] Array indexing: `arr[0]`
 
-### Phase 2: Advanced Types (v0.3.0)
-- [ ] Structs/records
-- [ ] Enum types
+### Phase 2: Advanced Types (v0.3.0) ✅ Partial
+- [x] Struct definitions
+- [x] Enum definitions
+- [ ] Struct/Enum instantiation with qualified names (Color::Red)
 - [ ] Tuple types
 - [ ] Pattern matching (match/case)
 
@@ -199,7 +201,7 @@ The following features are planned but not yet implemented:
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for development setup and guidelines.
 
 ## License
 
