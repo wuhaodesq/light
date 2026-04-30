@@ -1,0 +1,6 @@
+use std.hw.gpio
+
+fn main() {
+    let led = gpio.pin(13)
+    print("test")
+}

@@ -35,6 +35,8 @@ enum Commands {
         target: Option<String>,
         #[arg(long = "no-std", default_value_t = false)]
         no_std: bool,
+        #[arg(long)]
+        linker: Option<PathBuf>,
     },
     Firmware {
         #[command(subcommand)]
@@ -53,6 +55,10 @@ enum Commands {
         #[command(subcommand)]
         command: TargetCommands,
     },
+    Interfaces {
+        #[command(subcommand)]
+        command: Option<InterfaceCommands>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -61,6 +67,8 @@ enum FirmwareCommands {
         file: PathBuf,
         #[arg(long)]
         target: String,
+        #[arg(long)]
+        linker: Option<PathBuf>,
     },
 }
 
@@ -69,28 +77,33 @@ enum TargetCommands {
     List,
 }
 
+#[derive(Debug, Subcommand)]
+enum InterfaceCommands {
+    List,
+}
+
 pub fn run() -> Result<(), Diagnostic> {
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Run { file } => {
-            let program = crate::utils::load_program(&file)?;
-            crate::semantic::analyze(&program)?;
-            crate::interpreter::run(&program)
+            let loaded = crate::utils::load_program(&file)?;
+            crate::semantic::analyze(&loaded.program)?;
+            crate::interpreter::run(&loaded.program)
         }
         Commands::Ast { file, json } => {
-            let program = crate::utils::load_program(&file)?;
+            let loaded = crate::utils::load_program(&file)?;
             if json {
-                let json = serde_json::to_string_pretty(&program).expect("serialize ast");
+                let json = serde_json::to_string_pretty(&loaded.program).expect("serialize ast");
                 println!("{json}");
             } else {
-                println!("{:#?}", program);
+                println!("{:#?}", loaded.program);
             }
             Ok(())
         }
         Commands::Check { file } => {
-            let program = crate::utils::load_program(&file)?;
-            crate::semantic::analyze(&program)?;
+            let loaded = crate::utils::load_program(&file)?;
+            crate::semantic::analyze(&loaded.program)?;
             println!("ok");
             Ok(())
         }
@@ -116,38 +129,26 @@ pub fn run() -> Result<(), Diagnostic> {
             file,
             target,
             no_std,
+            linker,
         } => {
-            let source = fs::read_to_string(&file).map_err(|e| {
-                Diagnostic::new(
-                    crate::diagnostics::DiagnosticCode::RuntimeError,
-                    e.to_string(),
-                    crate::diagnostics::Span::new(0, 0),
-                )
-            })?;
+            let loaded = crate::utils::load_program(&file)?;
             if no_std {
-                crate::backend::validate_no_std_source(&source)?;
+                crate::backend::validate_no_std_source(&loaded.source)?;
             }
-            let program = crate::utils::load_program(&file)?;
-            crate::semantic::analyze(&program)?;
+            crate::semantic::analyze(&loaded.program)?;
             crate::backend::build_program(
-                &program,
+                &loaded.program,
                 target.unwrap_or_else(|| "x86_64-linux".to_string()),
                 no_std,
+                linker.as_deref(),
             )
         }
         Commands::Firmware { command } => match command {
-            FirmwareCommands::Build { file, target } => {
-                let source = fs::read_to_string(&file).map_err(|e| {
-                    Diagnostic::new(
-                        crate::diagnostics::DiagnosticCode::RuntimeError,
-                        e.to_string(),
-                        crate::diagnostics::Span::new(0, 0),
-                    )
-                })?;
-                crate::backend::validate_no_std_source(&source)?;
-                let program = crate::utils::load_program(&file)?;
-                crate::semantic::analyze(&program)?;
-                crate::hal::build_firmware(&program, &target)
+            FirmwareCommands::Build { file, target, linker } => {
+                let loaded = crate::utils::load_program(&file)?;
+                crate::backend::validate_no_std_source(&loaded.source)?;
+                crate::semantic::analyze(&loaded.program)?;
+                crate::hal::build_firmware(&loaded.program, &target, linker.as_deref())
             }
         },
         Commands::Flash {
@@ -164,5 +165,18 @@ pub fn run() -> Result<(), Diagnostic> {
                 Ok(())
             }
         },
+        Commands::Interfaces { command } => {
+            if command.is_none() {
+                crate::hal::list_flash_interfaces();
+                Ok(())
+            } else {
+                match command.unwrap() {
+                    InterfaceCommands::List => {
+                        crate::hal::list_flash_interfaces();
+                        Ok(())
+                    }
+                }
+            }
+        }
     }
 }

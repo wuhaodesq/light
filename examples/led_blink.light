@@ -1,0 +1,8 @@
+use std.hw.gpio
+
+fn main() {
+    let led = gpio.pin(13)
+    print("LED initialized on pin", 13)
+    sleep_ms(500)
+    print("Done")
+}

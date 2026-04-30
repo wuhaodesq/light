@@ -7,6 +7,8 @@ pub enum Token {
     Return,
     If,
     Else,
+    While,
+    Use,
     Identifier(String),
     Number(f64),
     String(String),
@@ -15,6 +17,12 @@ pub enum Token {
     Star,
     Slash,
     Equal,
+    EqualEqual,
+    NotEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
     LParen,
     RParen,
     LBrace,
@@ -22,6 +30,7 @@ pub enum Token {
     Comma,
     Colon,
     Arrow,
+    Dot,
     Newline,
     Eof,
 }
@@ -51,35 +60,68 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
             }
             '*' => Token::Star,
             '/' => Token::Slash,
-            '=' => Token::Equal,
+            '=' => {
+                if let Some((_, '=')) = chars.peek() {
+                    chars.next();
+                    Token::EqualEqual
+                } else {
+                    Token::Equal
+                }
+            }
+            '!' => {
+                if let Some((_, '=')) = chars.peek() {
+                    chars.next();
+                    Token::NotEqual
+                } else {
+                    return Err(Diagnostic::new(
+                        DiagnosticCode::UnexpectedToken,
+                        "unexpected character: ! (did you mean !=?)",
+                        Span::new(idx, idx + 1),
+                    ));
+                }
+            }
+            '<' => {
+                if let Some((_, '=')) = chars.peek() {
+                    chars.next();
+                    Token::LessEqual
+                } else {
+                    Token::Less
+                }
+            }
+            '>' => {
+                if let Some((_, '=')) = chars.peek() {
+                    chars.next();
+                    Token::GreaterEqual
+                } else {
+                    Token::Greater
+                }
+            }
             '(' => Token::LParen,
             ')' => Token::RParen,
             '{' => Token::LBrace,
             '}' => Token::RBrace,
             ',' => Token::Comma,
             ':' => Token::Colon,
+            '.' => Token::Dot,
             '"' => {
+                let start = idx;
                 let mut content = String::new();
-                let mut end = idx;
                 loop {
                     match chars.next() {
-                        Some((string_idx, '"')) => {
-                            end = string_idx;
-                            break;
-                        }
+                        Some((_, '"')) => break,
                         Some((_, c)) => content.push(c),
                         None => {
                             return Err(Diagnostic::new(
                                 DiagnosticCode::UnexpectedToken,
                                 "unterminated string literal",
-                                Span::new(idx, idx + 1),
+                                Span::new(start, start + 1),
                             ));
                         }
                     }
                 }
                 tokens.push(TokenWithSpan {
                     token: Token::String(content),
-                    span: Span::new(idx, end + 1),
+                    span: Span::new(start, start + 1),
                 });
                 continue;
             }
@@ -126,6 +168,8 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
                     "return" => Token::Return,
                     "if" => Token::If,
                     "else" => Token::Else,
+                    "while" => Token::While,
+                    "use" => Token::Use,
                     _ => Token::Identifier(ident),
                 };
                 tokens.push(TokenWithSpan {

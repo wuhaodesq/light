@@ -1,0 +1,5 @@
+use std.hw.gpio
+
+fn main() {
+    print("GPIO demo")
+}

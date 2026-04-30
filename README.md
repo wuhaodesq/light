@@ -1,6 +1,8 @@
 # Light Language (MVP Foundation)
 
-This repository currently implements the first **seven phases** in order:
+This repository implements a custom programming language with support for AI and embedded systems.
+
+## Implemented Phases (1-12 + Language Features)
 
 1. **阶段1：解释器** - `light run` executes `main` through an interpreter.
 2. **阶段2：AST + JSON** - `light ast --json` outputs stable JSON AST.
@@ -9,15 +11,103 @@ This repository currently implements the first **seven phases** in order:
 5. **阶段5：Linux 构建落盘** - `light build` emits `.elf/.bin/.hex` artifacts.
 6. **阶段6：ARM64/多目标构建目录** - build outputs are namespaced per target (`build/<target>/...`) including `aarch64-linux`.
 7. **阶段7：no_std 约束检查** - `--no-std` build paths reject forbidden APIs (`std.fs`, `std.net`) and dynamic allocation patterns.
+8. **阶段8：STM32 固件** - `light build` supports `stm32f407`, `stm32f103` with linker scripts.
+9. **阶段9：ESP32 固件** - `esp32-none-elf` target with `esp32.ld` linker script.
+10. **阶段10：烧录工具** - `light flash` supports STLink, JLink, OpenOCD, esptool, serial.
+11. **阶段11：HAL** - `use` statements, HAL builtins (`gpio.pin`, `sleep_ms`, etc.).
+12. **阶段12：AI 推理支持** - `use std.onnx`, `use std.camera` (stub).
+
+## Language Features
+
+- **Variables**: `let x = 10`
+- **Assignment**: `x = x + 1`
+- **Functions**: `fn add(a, b) -> i32 { return a + b }`
+- **Control Flow**: `if/else`, `while` loops
+- **Comparison**: `==`, `!=`, `<`, `<=`, `>`, `>=`
+- **Arithmetic**: `+`, `-`, `*`, `/`
+- **Strings**: Concatenation (`+`), equality (`==`, `!=`)
+- **HAL Builtins**: `gpio.pin()`, `sleep_ms()`, etc.
+- **Error Reporting**: Source spans with line:column location
 
 ## Quick start
 
 ```bash
+# Run
 cargo run -- run examples/hello.light
+cargo run -- run examples/control_flow.light
+
+# Parse and check
 cargo run -- ast examples/hello.light --json
 cargo run -- check examples/hello.light
+cargo run -- fmt examples/hello.light
+
+# Build for Linux
 cargo run -- build examples/hello.light --target x86_64-linux
 cargo run -- build examples/hello.light --target aarch64-linux
-cargo run -- firmware build examples/hello.light --target thumbv7em-none-eabihf
+
+# Build for embedded
+cargo run -- build examples/hello.light --target stm32f407 --no-std
+cargo run -- build examples/hello.light --target thumbv7em-none-eabihf --no-std
+cargo run -- build examples/hello.light --target esp32-none-elf --no-std
+
+# Firmware build with linker script
+cargo run -- firmware build examples/hello.light --target stm32f407
+cargo run -- firmware build examples/hello.light --target stm32f407 --linker linker/stm32f407.ld
+
+# Flash firmware
+cargo run -- flash build/firmware/stm32f407/main.bin --target stm32f407 --interface stlink
+cargo run -- flash build/firmware/stm32f407/main.bin --target stm32f407 --interface jlink
+
+# List targets and interfaces
 cargo run -- targets list
+cargo run -- interfaces list
 ```
+
+## Supported Targets
+
+```
+x86_64-linux
+aarch64-linux
+armv7-linux
+riscv64-linux
+thumbv7em-none-eabihf
+riscv32imac-none-elf
+esp32-none-elf
+stm32f407
+stm32f103
+```
+
+## Supported Flash Interfaces
+
+```
+stlink, st    - STLink (STM32)
+jlink, jl     - JLink (ARM Cortex)
+esptool, esp  - esptool.py (ESP32)
+openocd, ocd  - OpenOCD (multi-vendor)
+serial, uart  - Serial/UART bootloader
+```
+
+## HAL Builtins
+
+```light
+use std.hw.gpio
+
+fn main() {
+    let led = gpio.pin(13)
+    gpio.high(led)
+    sleep_ms(500)
+    gpio.low(led)
+}
+```
+
+## Examples
+
+See `examples/` directory:
+- `demo.light` - Complete demo with all language features
+- `hello.light` - Basic function and print
+- `control_flow.light` - If/else, while loops, comparisons
+- `string_test.light` - String operations
+- `gpio.light` - GPIO HAL demo
+- `led_blink.light` - LED blink demo
+- `ai.light` - AI inference stub
+- `led.light` - Simple LED demo
