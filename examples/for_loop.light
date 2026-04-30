@@ -1,0 +1,12 @@
+fn main() {
+    let numbers = [1, 2, 3, 4, 5]
+    print("First element: " + numbers[0])
+    print("Array length: " + 5)
+
+    let sum = 0
+    for (let i = 0; i < 5; i + 1) {
+        sum = sum + numbers[i]
+        i = i + 1
+    }
+    print("Sum: " + sum)
+}

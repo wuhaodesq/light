@@ -286,6 +286,19 @@ fn lower_stmt(stmt: &Stmt) -> String {
             out.push('}');
             out
         }
+        Stmt::For { initializer, condition, increment, body } => {
+            let init_str = initializer.as_ref().map(|s| lower_stmt(s)).unwrap_or_default();
+            let cond_str = condition.as_ref().map(|e| lower_expr(e)).unwrap_or_default();
+            let incr_str = increment.as_ref().map(|e| lower_expr(e)).unwrap_or_default();
+            let mut out = format!("for ({}; {}; {}) {{\n", init_str, cond_str, incr_str);
+            for s in body {
+                out.push_str("  ");
+                out.push_str(&lower_stmt(s));
+                out.push('\n');
+            }
+            out.push('}');
+            out
+        }
     }
 }
 
@@ -294,6 +307,13 @@ fn lower_expr(expr: &Expr) -> String {
         Expr::Number(v) => v.to_string(),
         Expr::String(v) => format!("\"{v}\""),
         Expr::Identifier(v) => v.clone(),
+        Expr::Array(elements) => {
+            let items = elements.iter().map(lower_expr).collect::<Vec<_>>().join(", ");
+            format!("array[{items}]")
+        }
+        Expr::ArrayIndex(arr, index) => {
+            format!("index({}, {})", lower_expr(arr), lower_expr(index))
+        }
         Expr::Binary(lhs, op, rhs) => {
             let op = match op {
                 crate::ast::BinaryOp::Add => "add",

@@ -1,100 +1,21 @@
-use std.hw.gpio
+fn main() {
+    /* Demo with all v0.2.0 features:
+       - Multi-line comments
+       - For loops
+       - Arrays */
+    let numbers = [1, 2, 3, 4, 5]
+    print("=== Arrays ===")
+    print("First element: " + numbers[0])
 
-fn add(a, b) -> i32 {
-    return a + b
-}
-
-fn fib(n) -> i32 {
-    if n <= 1 {
-        return n
-    }
-    return fib(n - 1) + fib(n - 2)
-}
-
-fn factorial(n) -> i32 {
-    let result = 1
-    let i = 1
-    while i <= n {
-        result = result * i
+    print("=== For Loop ===")
+    let sum = 0
+    for (let i = 0; i < 5; i + 1) {
+        sum = sum + numbers[i]
         i = i + 1
     }
-    return result
-}
+    print("Sum of array: " + sum)
 
-fn main() {
-    print("=== Light Language Demo ===")
-
-    let x = 10
-    let y = 20
-    print("x = ", x)
-    print("y = ", y)
-    print("x + y = ", add(x, y))
-
-    print("--- Comparison ---")
-    print("x < y: ", x < y)
-    print("x > y: ", x > y)
-    print("x == 10: ", x == 10)
-    print("x != y: ", x != y)
-
-    print("--- Control Flow ---")
-    if x < y {
-        print("x is less than y")
-    } else {
-        print("x is greater than or equal to y")
-    }
-
-    let score = 85
-    if score >= 90 {
-        print("Grade: A")
-    } else if score >= 80 {
-        print("Grade: B")
-    } else if score >= 70 {
-        print("Grade: C")
-    } else {
-        print("Grade: F")
-    }
-
-    print("--- While Loop ---")
-    let counter = 0
-    while counter < 5 {
-        print("count: ", counter)
-        counter = counter + 1
-    }
-
-    print("--- Functions ---")
-    print("fib(10) = ", fib(10))
-    print("factorial(5) = ", factorial(5))
-
-    let a = "hello"
-    let b = "world"
-    print("--- Strings ---")
-    print(a, " ", b)
-    print("a == hello: ", a == "hello")
-    print("a != b: ", a != b)
-
-    print("--- Assignment ---")
-    let var = 100
-    print("var = ", var)
-    var = var / 2
-    print("var / 2 = ", var)
-    var = var + 10
-    print("var + 10 = ", var)
-
-    print("--- Arithmetic ---")
-    let num1 = 15
-    let num2 = 4
-    print("15 + 4 = ", num1 + num2)
-    print("15 - 4 = ", num1 - num2)
-    print("15 * 4 = ", num1 * num2)
-    print("15 / 4 = ", num1 / num2)
-
-    print("--- GPIO Demo (simulated) ---")
-    let led = gpio.pin(13)
-    print("Created pin: ", led)
-    gpio.high(led)
-    print("LED on")
-    gpio.low(led)
-    print("LED off")
-
+    /* Multi-line
+       comment test */
     print("=== Demo Complete ===")
 }

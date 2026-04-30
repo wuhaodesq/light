@@ -139,6 +139,10 @@ impl Parser {
             return self.parse_while_stmt();
         }
 
+        if self.check(&Token::For) {
+            return self.parse_for_stmt();
+        }
+
         // Check for assignment: identifier = expr (lookahead)
         let is_assignment = matches!(&self.peek().token, Token::Identifier(_))
             && {
@@ -210,6 +214,76 @@ impl Parser {
         self.expect(Token::RBrace, "expected `}`")?;
 
         Ok(Stmt::While { condition, body })
+    }
+
+    fn parse_for_stmt(&mut self) -> Result<Stmt, Diagnostic> {
+        self.expect(Token::For, "expected `for`")?;
+        self.expect(Token::LParen, "expected `(`")?;
+        self.skip_newlines();
+
+        let initializer = if !self.check(&Token::Semicolon) {
+            Some(Box::new(self.parse_for_init()?))
+        } else {
+            None
+        };
+
+        self.expect(Token::Semicolon, "expected `;`")?;
+        self.skip_newlines();
+
+        let condition = if !self.check(&Token::Semicolon) {
+            Some(self.parse_expr()?)
+        } else {
+            None
+        };
+
+        self.expect(Token::Semicolon, "expected `;`")?;
+        self.skip_newlines();
+
+        let increment = if !self.check(&Token::RParen) {
+            Some(Box::new(self.parse_expr()?))
+        } else {
+            None
+        };
+
+        self.expect(Token::RParen, "expected `)`")?;
+        self.skip_newlines();
+
+        self.expect(Token::LBrace, "expected `{`")?;
+        self.skip_newlines();
+
+        let mut body = Vec::new();
+        while !self.check(&Token::RBrace) && !self.is_at_end() {
+            body.push(self.parse_stmt()?);
+            self.skip_newlines();
+        }
+        self.expect(Token::RBrace, "expected `}`")?;
+
+        Ok(Stmt::For { initializer, condition, increment, body })
+    }
+
+    fn parse_for_init(&mut self) -> Result<Stmt, Diagnostic> {
+        if self.check(&Token::Let) {
+            self.advance();
+            let name = self.expect_identifier("expected variable name after let")?;
+            self.expect(Token::Equal, "expected `=` after variable name")?;
+            let expr = self.parse_expr()?;
+            Ok(Stmt::Let(name, expr))
+        } else if matches!(&self.peek().token, Token::Identifier(_))
+            && {
+                let saved_pos = self.pos;
+                self.advance();
+                let is_eq = self.check(&Token::Equal);
+                self.pos = saved_pos;
+                is_eq
+            }
+        {
+            let name = self.expect_identifier("expected variable name")?;
+            self.advance();
+            let expr = self.parse_expr()?;
+            Ok(Stmt::Assign(name, expr))
+        } else {
+            Ok(Stmt::Expr(self.parse_expr()?))
+        }
     }
 
     fn parse_expr(&mut self) -> Result<Expr, Diagnostic> {
@@ -327,9 +401,30 @@ impl Parser {
                     }
                     self.expect(Token::RParen, "expected `)`")?;
                     Ok(Expr::Call { callee: name, args })
+                } else if self.check(&Token::LBracket) {
+                    self.advance();
+                    let index = self.parse_expr()?;
+                    self.expect(Token::RBracket, "expected `]`")?;
+                    Ok(Expr::ArrayIndex(Box::new(Expr::Identifier(name)), Box::new(index)))
                 } else {
                     Ok(Expr::Identifier(name))
                 }
+            }
+            Token::LBracket => {
+                self.advance();
+                let mut elements = Vec::new();
+                if !self.check(&Token::RBracket) {
+                    loop {
+                        elements.push(self.parse_expr()?);
+                        if self.check(&Token::Comma) {
+                            self.advance();
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                self.expect(Token::RBracket, "expected `]`")?;
+                Ok(Expr::Array(elements))
             }
             Token::LParen => {
                 self.advance();

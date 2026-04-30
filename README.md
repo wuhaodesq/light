@@ -22,10 +22,12 @@ This repository implements a custom programming language with support for AI and
 - **Variables**: `let x = 10`
 - **Assignment**: `x = x + 1`
 - **Functions**: `fn add(a, b) -> i32 { return a + b }`
-- **Control Flow**: `if/else`, `while` loops
+- **Control Flow**: `if/else`, `while` loops, `for` loops
 - **Comparison**: `==`, `!=`, `<`, `<=`, `>`, `>=`
 - **Arithmetic**: `+`, `-`, `*`, `/`
 - **Strings**: Concatenation (`+`), equality (`==`, `!=`)
+- **Arrays**: `let arr = [1, 2, 3]`, `arr[0]`
+- **Comments**: `// single-line`, `/* multi-line */`
 - **HAL Builtins**: `gpio.pin()`, `sleep_ms()`, etc.
 - **Error Reporting**: Source spans with line:column location
 
@@ -140,3 +142,65 @@ A VS Code extension for Light language is available in `vscode-extension/`.
    vsce package
    # Install: code --install-extension light-language-0.1.0.vsix
    ```
+
+## Not Yet Supported
+
+The following features are planned but not yet implemented:
+
+- Custom structs/classes
+- Match/case expressions
+- Multi-file modules (beyond `use` statements)
+- Generic functions
+- Closures/anonymous functions
+- Error handling (try/catch)
+- File import/export modules
+
+## Implementation Roadmap
+
+### Phase 1: Core Language (v0.2.0) ✅ Complete
+- [x] Multi-line comments (`/* ... */`)
+- [x] For loops
+- [x] Arrays: `let arr = [1, 2, 3]`
+- [x] Array indexing: `arr[0]`
+
+### Phase 2: Advanced Types (v0.3.0)
+- [ ] Structs/records
+- [ ] Enum types
+- [ ] Tuple types
+- [ ] Pattern matching (match/case)
+
+### Phase 3: Functions (v0.4.0)
+- [ ] Generic functions: `fn identity<T>(x: T) -> T`
+- [ ] Closures/anonymous functions
+- [ ] Higher-order functions
+
+### Phase 4: Error Handling (v0.5.0)
+- [ ] Result types
+- [ ] try/catch error handling
+- [ ] Option type with None
+
+### Phase 5: Modules (v0.6.0)
+- [ ] Multi-file projects
+- [ ] Module imports from files
+- [ ] Standard library
+- [ ] Package manager
+
+### Phase 6: Tooling (v0.7.0)
+- [ ] Language Server Protocol (LSP)
+- [ ] Debugger support
+- [ ] REPL
+- [ ] Better IDE integration
+
+### Phase 7: Advanced Features (v0.8.0)
+- [ ] Traits/interfaces
+- [ ] Async/await
+- [ ] Macro system
+- [ ] Metaprogramming
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+
+## License
+
+This project is licensed under the MIT License - see [LICENSE](LICENSE) for details.

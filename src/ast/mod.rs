@@ -5,6 +5,8 @@ pub enum Expr {
     Number(f64),
     String(String),
     Identifier(String),
+    Array(Vec<Expr>),
+    ArrayIndex(Box<Expr>, Box<Expr>),
     Binary(Box<Expr>, BinaryOp, Box<Expr>),
     Call { callee: String, args: Vec<Expr> },
 }
@@ -32,6 +34,7 @@ pub enum Stmt {
     Use(UseStmt),
     If { condition: Expr, then_block: Vec<Stmt>, else_block: Option<Vec<Stmt>> },
     While { condition: Expr, body: Vec<Stmt> },
+    For { initializer: Option<Box<Stmt>>, condition: Option<Expr>, increment: Option<Box<Expr>>, body: Vec<Stmt> },
 }
 
 #[derive(Debug, Clone, Serialize)]

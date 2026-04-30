@@ -82,6 +82,19 @@ fn format_stmt(stmt: &crate::ast::Stmt) -> String {
             out.push('}');
             out
         }
+        crate::ast::Stmt::For { initializer, condition, increment, body } => {
+            let init_str = initializer.as_ref().map(|s| format_stmt(s)).unwrap_or_default();
+            let cond_str = condition.as_ref().map(|e| format_expr(e)).unwrap_or_default();
+            let incr_str = increment.as_ref().map(|e| format_expr(e)).unwrap_or_default();
+            let mut out = format!("for ({}; {}; {}) {{\n", init_str, cond_str, incr_str);
+            for s in body {
+                out.push_str("    ");
+                out.push_str(&format_stmt(s));
+                out.push('\n');
+            }
+            out.push('}');
+            out
+        }
     }
 }
 
@@ -90,6 +103,13 @@ fn format_expr(expr: &crate::ast::Expr) -> String {
         crate::ast::Expr::Number(v) => v.to_string(),
         crate::ast::Expr::String(v) => format!("\"{v}\""),
         crate::ast::Expr::Identifier(v) => v.clone(),
+        crate::ast::Expr::Array(elements) => {
+            let items = elements.iter().map(format_expr).collect::<Vec<_>>().join(", ");
+            format!("[{items}]")
+        }
+        crate::ast::Expr::ArrayIndex(arr, index) => {
+            format!("{}[{}]", format_expr(arr), format_expr(index))
+        }
         crate::ast::Expr::Binary(lhs, op, rhs) => format!(
             "{} {} {}",
             format_expr(lhs),

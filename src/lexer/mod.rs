@@ -8,6 +8,7 @@ pub enum Token {
     If,
     Else,
     While,
+    For,
     Use,
     Identifier(String),
     Number(f64),
@@ -25,9 +26,12 @@ pub enum Token {
     GreaterEqual,
     LParen,
     RParen,
+    LBracket,
+    RBracket,
     LBrace,
     RBrace,
     Comma,
+    Semicolon,
     Colon,
     Arrow,
     Dot,
@@ -65,6 +69,34 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
                         if ch == '\n' {
                             break;
                         }
+                    }
+                    continue;
+                } else if let Some((_, '*')) = chars.peek() {
+                    chars.next();
+                    let start = idx;
+                    let mut depth = 1;
+                    while let Some((_, ch)) = chars.next() {
+                        if ch == '*' {
+                            if let Some((_, '/')) = chars.peek() {
+                                chars.next();
+                                depth -= 1;
+                                if depth == 0 {
+                                    break;
+                                }
+                            }
+                        } else if ch == '/' {
+                            if let Some((_, '*')) = chars.peek() {
+                                chars.next();
+                                depth += 1;
+                            }
+                        }
+                    }
+                    if depth != 0 {
+                        return Err(Diagnostic::new(
+                            DiagnosticCode::UnexpectedToken,
+                            "unterminated multi-line comment",
+                            Span::new(start, start + 2),
+                        ));
                     }
                     continue;
                 } else {
@@ -109,9 +141,12 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
             }
             '(' => Token::LParen,
             ')' => Token::RParen,
+            '[' => Token::LBracket,
+            ']' => Token::RBracket,
             '{' => Token::LBrace,
             '}' => Token::RBrace,
             ',' => Token::Comma,
+            ';' => Token::Semicolon,
             ':' => Token::Colon,
             '.' => Token::Dot,
             '"' => {
@@ -204,6 +239,7 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
                     "if" => Token::If,
                     "else" => Token::Else,
                     "while" => Token::While,
+                    "for" => Token::For,
                     "use" => Token::Use,
                     _ => Token::Identifier(ident),
                 };
@@ -352,6 +388,29 @@ mod tests {
     #[test]
     fn test_unknown_escape() {
         let result = lex("\"\\q\"");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_multiline_comments() {
+        let source = "/* comment */let x = 10";
+        let tokens = lex(source).unwrap();
+        assert!(tokens.len() >= 3);
+        assert_eq!(tokens[0].token, Token::Let);
+        assert_eq!(tokens[1].token, Token::Identifier("x".to_string()));
+    }
+
+    #[test]
+    fn test_multiline_comments_nested() {
+        let source = "/* outer /* nested */ still outer */let x = 10";
+        let tokens = lex(source).unwrap();
+        assert!(tokens.len() >= 3);
+        assert_eq!(tokens[0].token, Token::Let);
+    }
+
+    #[test]
+    fn test_unterminated_multiline_comment() {
+        let result = lex("/* unclosed comment");
         assert!(result.is_err());
     }
 }

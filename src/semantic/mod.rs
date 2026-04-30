@@ -60,22 +60,37 @@ fn analyze_function(
             Stmt::Use(_) => {}
             Stmt::If { condition, then_block, else_block } => {
                 check_expr(condition, &bindings, signatures)?;
-                let then_bindings = bindings.clone();
+                let mut then_bindings = bindings.clone();
                 for s in then_block {
-                    check_stmt(s, &then_bindings, signatures)?;
+                    check_stmt(s, &mut then_bindings, signatures)?;
                 }
                 if let Some(else_b) = else_block {
-                    let else_bindings = bindings.clone();
+                    let mut else_bindings = bindings.clone();
                     for s in else_b {
-                        check_stmt(s, &else_bindings, signatures)?;
+                        check_stmt(s, &mut else_bindings, signatures)?;
                     }
                 }
             }
             Stmt::While { condition, body } => {
                 check_expr(condition, &bindings, signatures)?;
-                let body_bindings = bindings.clone();
+                let mut body_bindings = bindings.clone();
                 for s in body {
-                    check_stmt(s, &body_bindings, signatures)?;
+                    check_stmt(s, &mut body_bindings, signatures)?;
+                }
+            }
+            Stmt::For { initializer, condition, increment, body } => {
+                let mut for_bindings = bindings.clone();
+                if let Some(init) = initializer {
+                    check_stmt(init, &mut for_bindings, signatures)?;
+                }
+                if let Some(cond) = condition {
+                    check_expr(cond, &for_bindings, signatures)?;
+                }
+                if let Some(inc) = increment {
+                    check_expr(inc, &for_bindings, signatures)?;
+                }
+                for s in body {
+                    check_stmt(s, &mut for_bindings, signatures)?;
                 }
             }
         }
@@ -86,15 +101,16 @@ fn analyze_function(
 
 fn check_stmt(
     stmt: &Stmt,
-    bindings: &HashSet<String>,
+    bindings: &mut HashSet<String>,
     signatures: &HashMap<String, usize>,
 ) -> Result<(), Diagnostic> {
     match stmt {
-        Stmt::Let(_name, expr) => {
+        Stmt::Let(name, expr) => {
             check_expr(expr, bindings, signatures)?;
+            bindings.insert(name.clone());
             Ok(())
         }
-        Stmt::Assign(_name, expr) => {
+        Stmt::Assign(name, expr) => {
             check_expr(expr, bindings, signatures)?;
             Ok(())
         }
@@ -114,6 +130,21 @@ fn check_stmt(
         }
         Stmt::While { condition, body } => {
             check_expr(condition, bindings, signatures)?;
+            for s in body {
+                check_stmt(s, bindings, signatures)?;
+            }
+            Ok(())
+        }
+        Stmt::For { initializer, condition, increment, body } => {
+            if let Some(init) = initializer {
+                check_stmt(init, bindings, signatures)?;
+            }
+            if let Some(cond) = condition {
+                check_expr(cond, bindings, signatures)?;
+            }
+            if let Some(inc) = increment {
+                check_expr(inc, bindings, signatures)?;
+            }
             for s in body {
                 check_stmt(s, bindings, signatures)?;
             }
@@ -171,5 +202,15 @@ fn check_expr(
             Ok(())
         }
         Expr::Number(_) | Expr::String(_) => Ok(()),
+        Expr::Array(elements) => {
+            for elem in elements {
+                check_expr(elem, bindings, signatures)?;
+            }
+            Ok(())
+        }
+        Expr::ArrayIndex(arr, index) => {
+            check_expr(arr, bindings, signatures)?;
+            check_expr(index, bindings, signatures)
+        }
     }
 }

@@ -9,6 +9,7 @@ enum Value {
     String(String),
     Unit,
     GpioPin(u32),
+    Array(Vec<Value>),
 }
 
 pub fn run(program: &Program) -> Result<(), Diagnostic> {
@@ -98,6 +99,27 @@ fn eval_function<'a>(
                     }
                 }
             }
+            Stmt::For { initializer, condition, increment, body } => {
+                if let Some(init) = initializer {
+                    eval_stmt(init, &mut env, functions, uses)?;
+                }
+                loop {
+                    if let Some(cond) = condition {
+                        let cond_val = eval_expr(cond, &mut env, functions, uses)?;
+                        if !is_truthy(&cond_val) {
+                            break;
+                        }
+                    }
+                    for s in body {
+                        if let Some(val) = eval_stmt(s, &mut env, functions, uses)? {
+                            return Ok(val);
+                        }
+                    }
+                    if let Some(inc) = increment {
+                        eval_expr(inc, &mut env, functions, uses)?;
+                    }
+                }
+            }
         }
     }
 
@@ -120,6 +142,44 @@ fn eval_expr<'a>(
                 Span::new(0, 0),
             )
         }),
+        Expr::Array(elements) => {
+            let mut values = Vec::new();
+            for elem in elements {
+                values.push(eval_expr(elem, env, functions, uses)?);
+            }
+            Ok(Value::Array(values))
+        }
+        Expr::ArrayIndex(arr_expr, index_expr) => {
+            let arr = eval_expr(arr_expr, env, functions, uses)?;
+            let index = eval_expr(index_expr, env, functions, uses)?;
+            match arr {
+                Value::Array(values) => {
+                    match index {
+                        Value::Number(idx) => {
+                            let i = idx as usize;
+                            if i >= values.len() {
+                                return Err(Diagnostic::new(
+                                    DiagnosticCode::RuntimeError,
+                                    format!("array index out of bounds: {} >= {}", i, values.len()),
+                                    Span::new(0, 0),
+                                ));
+                            }
+                            Ok(values[i].clone())
+                        }
+                        _ => Err(Diagnostic::new(
+                            DiagnosticCode::RuntimeError,
+                            "array index must be a number",
+                            Span::new(0, 0),
+                        )),
+                    }
+                }
+                _ => Err(Diagnostic::new(
+                    DiagnosticCode::RuntimeError,
+                    "cannot index non-array value",
+                    Span::new(0, 0),
+                )),
+            }
+        }
         Expr::Binary(lhs, op, rhs) => {
             let lhs = eval_expr(lhs, env, functions, uses)?;
             let rhs = eval_expr(rhs, env, functions, uses)?;
@@ -139,6 +199,10 @@ fn eval_expr<'a>(
                         Value::String(v) => v.clone(),
                         Value::Unit => String::from("()"),
                         Value::GpioPin(pin) => format!("GPIO pin {}", pin),
+                        Value::Array(arr) => {
+                            let items: Vec<String> = arr.iter().map(|v| format!("{:?}", v)).collect();
+                            format!("[{}]", items.join(", "))
+                        }
                     };
                     if !out.is_empty() {
                         out.push(' ');
@@ -259,6 +323,28 @@ fn eval_stmt<'a>(
             }
             Ok(None)
         }
+        Stmt::For { initializer, condition, increment, body } => {
+            if let Some(init) = initializer {
+                eval_stmt(init, env, functions, uses)?;
+            }
+            loop {
+                if let Some(cond) = condition {
+                    let cond_val = eval_expr(cond, env, functions, uses)?;
+                    if !is_truthy(&cond_val) {
+                        break;
+                    }
+                }
+                for s in body {
+                    if let Some(val) = eval_stmt(s, env, functions, uses)? {
+                        return Ok(Some(val));
+                    }
+                }
+                if let Some(inc) = increment {
+                    eval_expr(inc, env, functions, uses)?;
+                }
+            }
+            Ok(None)
+        }
     }
 }
 
@@ -268,6 +354,7 @@ fn is_truthy(value: &Value) -> bool {
         Value::String(s) => !s.is_empty(),
         Value::Unit => false,
         Value::GpioPin(_) => true,
+        Value::Array(arr) => !arr.is_empty(),
     }
 }
 
@@ -296,6 +383,30 @@ fn eval_binary(lhs: Value, op: &BinaryOp, rhs: Value) -> Result<Value, Diagnosti
                 _ => Err(Diagnostic::new(
                     DiagnosticCode::RuntimeError,
                     "comparison operators not supported for strings",
+                    Span::new(0, 0),
+                )),
+            }
+        }
+        (Value::String(lhs), Value::Number(rhs)) => {
+            match op {
+                BinaryOp::Add => Ok(Value::String(lhs + &rhs.to_string())),
+                BinaryOp::Equal => Ok(Value::Number(0.0)),
+                BinaryOp::NotEqual => Ok(Value::Number(1.0)),
+                _ => Err(Diagnostic::new(
+                    DiagnosticCode::RuntimeError,
+                    "comparison operators not supported for string/number",
+                    Span::new(0, 0),
+                )),
+            }
+        }
+        (Value::Number(lhs), Value::String(rhs)) => {
+            match op {
+                BinaryOp::Add => Ok(Value::String(lhs.to_string() + &rhs)),
+                BinaryOp::Equal => Ok(Value::Number(0.0)),
+                BinaryOp::NotEqual => Ok(Value::Number(1.0)),
+                _ => Err(Diagnostic::new(
+                    DiagnosticCode::RuntimeError,
+                    "comparison operators not supported for string/number",
                     Span::new(0, 0),
                 )),
             }
