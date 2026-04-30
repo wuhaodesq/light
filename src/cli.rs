@@ -117,6 +117,16 @@ pub fn run() -> Result<(), Diagnostic> {
             target,
             no_std,
         } => {
+            let source = fs::read_to_string(&file).map_err(|e| {
+                Diagnostic::new(
+                    crate::diagnostics::DiagnosticCode::RuntimeError,
+                    e.to_string(),
+                    crate::diagnostics::Span::new(0, 0),
+                )
+            })?;
+            if no_std {
+                crate::backend::validate_no_std_source(&source)?;
+            }
             let program = crate::utils::load_program(&file)?;
             crate::semantic::analyze(&program)?;
             crate::backend::build_program(
@@ -127,6 +137,14 @@ pub fn run() -> Result<(), Diagnostic> {
         }
         Commands::Firmware { command } => match command {
             FirmwareCommands::Build { file, target } => {
+                let source = fs::read_to_string(&file).map_err(|e| {
+                    Diagnostic::new(
+                        crate::diagnostics::DiagnosticCode::RuntimeError,
+                        e.to_string(),
+                        crate::diagnostics::Span::new(0, 0),
+                    )
+                })?;
+                crate::backend::validate_no_std_source(&source)?;
                 let program = crate::utils::load_program(&file)?;
                 crate::semantic::analyze(&program)?;
                 crate::hal::build_firmware(&program, &target)

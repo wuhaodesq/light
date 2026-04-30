@@ -4,6 +4,20 @@ use std::path::PathBuf;
 use crate::ast::{Expr, Function, Program, Stmt};
 use crate::diagnostics::{Diagnostic, DiagnosticCode, Span};
 
+pub fn validate_no_std_source(source: &str) -> Result<(), Diagnostic> {
+    let banned = ["std.fs", "std.net", "alloc(", "vec!", "Box<"];
+    for pattern in banned {
+        if source.contains(pattern) {
+            return Err(Diagnostic::new(
+                DiagnosticCode::RuntimeError,
+                format!("`{pattern}` is not allowed in --no-std mode"),
+                Span::new(0, 0),
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub fn build_program(program: &Program, target: String, no_std: bool) -> Result<(), Diagnostic> {
     validate_target(&target, no_std)?;
 
