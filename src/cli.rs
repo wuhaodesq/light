@@ -94,7 +94,13 @@ pub fn run() -> Result<(), Diagnostic> {
         Commands::Ast { file, json } => {
             let loaded = crate::utils::load_program(&file)?;
             if json {
-                let json = serde_json::to_string_pretty(&loaded.program).expect("serialize ast");
+                let json = serde_json::to_string_pretty(&loaded.program).map_err(|e| {
+                    Diagnostic::new(
+                        crate::diagnostics::DiagnosticCode::RuntimeError,
+                        format!("failed to serialize AST: {e}"),
+                        crate::diagnostics::Span::new(0, 0),
+                    )
+                })?;
                 println!("{json}");
             } else {
                 println!("{:#?}", loaded.program);

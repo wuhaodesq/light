@@ -59,7 +59,18 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
                 }
             }
             '*' => Token::Star,
-            '/' => Token::Slash,
+            '/' => {
+                if let Some((_, '/')) = chars.peek() {
+                    while let Some((_, ch)) = chars.next() {
+                        if ch == '\n' {
+                            break;
+                        }
+                    }
+                    continue;
+                } else {
+                    Token::Slash
+                }
+            }
             '=' => {
                 if let Some((_, '=')) = chars.peek() {
                     chars.next();
@@ -106,10 +117,34 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
             '"' => {
                 let start = idx;
                 let mut content = String::new();
+                #[allow(unused_assignments)]
+                let mut end = start;
                 loop {
                     match chars.next() {
-                        Some((_, '"')) => break,
-                        Some((_, c)) => content.push(c),
+                        Some((next_idx, '"')) => {
+                            end = next_idx + 1;
+                            break;
+                        }
+                        Some((esc_idx, '\\')) => {
+                            if let Some((_, esc)) = chars.next() {
+                                match esc {
+                                    'n' => content.push('\n'),
+                                    't' => content.push('\t'),
+                                    '"' => content.push('"'),
+                                    '\\' => content.push('\\'),
+                                    _ => {
+                                        return Err(Diagnostic::new(
+                                            DiagnosticCode::UnexpectedToken,
+                                            format!("unknown escape sequence: \\{esc}"),
+                                            Span::new(esc_idx, esc_idx + 2),
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                        Some((_, c)) => {
+                            content.push(c);
+                        }
                         None => {
                             return Err(Diagnostic::new(
                                 DiagnosticCode::UnexpectedToken,
@@ -121,7 +156,7 @@ pub fn lex(source: &str) -> Result<Vec<TokenWithSpan>, Diagnostic> {
                 }
                 tokens.push(TokenWithSpan {
                     token: Token::String(content),
-                    span: Span::new(start, start + 1),
+                    span: Span::new(start, end),
                 });
                 continue;
             }
@@ -207,4 +242,116 @@ fn is_ident_start(c: char) -> bool {
 
 fn is_ident_continue(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_'
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_keywords() {
+        let tokens = lex("fn let return if else while use").unwrap();
+        let expected = vec![
+            Token::Fn,
+            Token::Let,
+            Token::Return,
+            Token::If,
+            Token::Else,
+            Token::While,
+            Token::Use,
+            Token::Eof,
+        ];
+        assert_eq!(tokens.len(), expected.len());
+        for (t, e) in tokens.iter().zip(expected.iter()) {
+            assert_eq!(&t.token, e);
+        }
+    }
+
+    #[test]
+    fn test_identifiers() {
+        let tokens = lex("foo bar123 _under").unwrap();
+        assert!(matches!(tokens[0].token, Token::Identifier(_) if matches!(&tokens[0].token, Token::Identifier(s) if s == "foo")));
+        assert!(matches!(tokens[1].token, Token::Identifier(_) if matches!(&tokens[1].token, Token::Identifier(s) if s == "bar123")));
+        assert!(matches!(tokens[2].token, Token::Identifier(_) if matches!(&tokens[2].token, Token::Identifier(s) if s == "_under")));
+    }
+
+    #[test]
+    fn test_numbers() {
+        let tokens = lex("42 3.14 0.5").unwrap();
+        assert!(matches!(tokens[0].token, Token::Number(n) if (n - 42.0).abs() < f64::EPSILON));
+        assert!(matches!(tokens[1].token, Token::Number(n) if (n - 3.14).abs() < 0.001));
+        assert!(matches!(tokens[2].token, Token::Number(n) if (n - 0.5).abs() < 0.001));
+    }
+
+    #[test]
+    fn test_string_simple() {
+        let tokens = lex("\"hello\"").unwrap();
+        assert!(matches!(&tokens[0].token, Token::String(s) if s == "hello"));
+        assert_eq!(tokens[0].span.start, 0);
+        assert_eq!(tokens[0].span.end, 7);
+    }
+
+    #[test]
+    fn test_string_with_escapes() {
+        let tokens = lex("\"hello\\nworld\"").unwrap();
+        assert!(matches!(&tokens[0].token, Token::String(s) if s == "hello\nworld"));
+    }
+
+    #[test]
+    fn test_string_escaped_quote() {
+        let tokens = lex("\"hello\\\"world\"").unwrap();
+        assert!(matches!(&tokens[0].token, Token::String(s) if s == "hello\"world"));
+    }
+
+    #[test]
+    fn test_comments() {
+        let source = "// this is a comment\nlet x = 10";
+        let tokens = lex(source).unwrap();
+        assert!(tokens.len() > 4);
+        let non_newline: Vec<&TokenWithSpan> = tokens.iter().filter(|t| !matches!(t.token, Token::Newline)).collect();
+        assert_eq!(non_newline[0].token, Token::Let);
+        assert_eq!(non_newline[1].token, Token::Identifier("x".to_string()));
+        assert_eq!(non_newline[2].token, Token::Equal);
+    }
+
+    #[test]
+    fn test_operators() {
+        let tokens = lex("+ - * / == != < <= > >= = ->").unwrap();
+        assert_eq!(tokens[0].token, Token::Plus);
+        assert_eq!(tokens[1].token, Token::Minus);
+        assert_eq!(tokens[2].token, Token::Star);
+        assert_eq!(tokens[3].token, Token::Slash);
+        assert_eq!(tokens[4].token, Token::EqualEqual);
+        assert_eq!(tokens[5].token, Token::NotEqual);
+        assert_eq!(tokens[6].token, Token::Less);
+        assert_eq!(tokens[7].token, Token::LessEqual);
+        assert_eq!(tokens[8].token, Token::Greater);
+        assert_eq!(tokens[9].token, Token::GreaterEqual);
+        assert_eq!(tokens[10].token, Token::Equal);
+        assert_eq!(tokens[11].token, Token::Arrow);
+    }
+
+    #[test]
+    fn test_punctuation() {
+        let tokens = lex("( ) { } , : .").unwrap();
+        assert_eq!(tokens[0].token, Token::LParen);
+        assert_eq!(tokens[1].token, Token::RParen);
+        assert_eq!(tokens[2].token, Token::LBrace);
+        assert_eq!(tokens[3].token, Token::RBrace);
+        assert_eq!(tokens[4].token, Token::Comma);
+        assert_eq!(tokens[5].token, Token::Colon);
+        assert_eq!(tokens[6].token, Token::Dot);
+    }
+
+    #[test]
+    fn test_unterminated_string() {
+        let result = lex("\"hello");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_unknown_escape() {
+        let result = lex("\"\\q\"");
+        assert!(result.is_err());
+    }
 }
