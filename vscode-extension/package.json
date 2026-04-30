@@ -1,0 +1,30 @@
+{
+  "name": "light-language",
+  "displayName": "Light Language",
+  "description": "Language support for Light programming language",
+  "version": "0.1.0",
+  "publisher": "light-lang",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "light",
+        "aliases": ["Light", "light"],
+        "extensions": [".light"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "light",
+        "scopeName": "source.light",
+        "path": "./syntaxes/light.tmLanguage.json"
+      }
+    ]
+  }
+}

@@ -111,3 +111,32 @@ See `examples/` directory:
 - `led_blink.light` - LED blink demo
 - `ai.light` - AI inference stub
 - `led.light` - Simple LED demo
+
+## VS Code Extension
+
+A VS Code extension for Light language is available in `vscode-extension/`.
+
+**Features**:
+- Syntax highlighting for `.light` files
+- Keywords: `fn`, `let`, `return`, `if`, `else`, `while`, `use`
+- String, number, and operator highlighting
+- Comment support (`//`)
+
+**Installation**:
+
+1. **Copy to VS Code extensions folder**:
+   ```bash
+   # Windows
+   copy vscode-extension %USERPROFILE%\.vscode\extensions\
+
+   # Linux/macOS
+   cp -r vscode-extension ~/.vscode/extensions/
+   ```
+
+2. **Build .vsix package** (requires Node.js):
+   ```bash
+   npm install -g @vscode/vsce
+   cd vscode-extension
+   vsce package
+   # Install: code --install-extension light-language-0.1.0.vsix
+   ```
