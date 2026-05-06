@@ -7,6 +7,116 @@ fn is_builtin_hal_function(name: &str) -> bool {
     matches!(
         name,
         "print"
+            | "len"
+            | "empty"
+            | "is_empty"
+            | "first"
+            | "last"
+            | "push"
+            | "pop"
+            | "append"
+            | "unshift"
+            | "product"
+            | "sort"
+            | "contains"
+            | "index_of"
+            | "last_index_of"
+            | "includes"
+            | "find_index"
+            | "reverse"
+            | "slice"
+            | "char_at"
+            | "insert"
+            | "remove"
+            | "take"
+            | "drop"
+            | "range"
+            | "lines"
+            | "flatten"
+            | "unique"
+            | "any"
+            | "all"
+            | "zip"
+            | "enumerate"
+            | "chunk"
+            | "average"
+            | "find"
+            | "filter"
+            | "reduce"
+            | "chars"
+            | "codes"
+            | "chr"
+            | "concat"
+            | "every"
+            | "some"
+            | "count"
+            | "has"
+            | "keys"
+            | "values"
+            | "fill"
+            | "repeat_n"
+            | "max_by"
+            | "min_by"
+            | "sign"
+            | "trunc"
+            | "fract"
+            | "split_at"
+            | "partition"
+            | "zip_with"
+            | "intersperse"
+            | "windows"
+            | "transpose"
+            | "scan"
+            | "group_by"
+            | "to_chars"
+            | "to_codes"
+            | "capitalize"
+            | "is_alpha"
+            | "is_digit"
+            | "is_space"
+            | "abs_diff"
+            | "mod"
+            | "gcd"
+            | "lcm"
+            | "is_negative"
+            | "is_positive"
+            | "is_zero"
+            | "increment"
+            | "decrement"
+            | "repeat"
+            | "replace_all"
+            | "trim_start"
+            | "trim_end"
+            | "pad_start"
+            | "pad_end"
+            | "sum"
+            | "split"
+            | "trim"
+            | "replace"
+            | "join"
+            | "to_uppercase"
+            | "to_lowercase"
+            | "starts_with"
+            | "ends_with"
+            | "abs"
+            | "min"
+            | "max"
+            | "pow"
+            | "floor"
+            | "ceil"
+            | "round"
+            | "sqrt"
+            | "to_string"
+            | "to_i32"
+            | "to_f64"
+            | "parse_int"
+            | "parse_float"
+            | "is_number"
+            | "is_string"
+            | "is_array"
+            | "is_boolean"
+            | "typeof"
+            | "clamp"
             | "gpio.pin"
             | "gpio.high"
             | "gpio.low"
@@ -74,7 +184,7 @@ fn analyze_function(
             }
             Stmt::Return(expr) | Stmt::Expr(expr) => check_expr(expr, &bindings, signatures, enum_variants)?,
             Stmt::Use(_) => {}
-            Stmt::StructDef { .. } | Stmt::EnumDef { .. } => {}
+            Stmt::StructDef { .. } | Stmt::EnumDef { .. } | Stmt::Loop { .. } => {}
             Stmt::If { condition, then_block, else_block } => {
                 check_expr(condition, &bindings, signatures, enum_variants)?;
                 let mut then_bindings = bindings.clone();
@@ -110,6 +220,7 @@ fn analyze_function(
                     check_stmt(s, &mut for_bindings, signatures, enum_variants)?;
                 }
             }
+            Stmt::Break | Stmt::Continue => {}
         }
     }
 
@@ -128,13 +239,14 @@ fn check_stmt(
             bindings.insert(name.clone());
             Ok(())
         }
-        Stmt::Assign(name, expr) => {
+        Stmt::Assign(_name, expr) => {
             check_expr(expr, bindings, signatures, enum_variants)?;
             Ok(())
         }
         Stmt::Return(expr) | Stmt::Expr(expr) => check_expr(expr, bindings, signatures, enum_variants),
         Stmt::Use(_) => Ok(()),
-        Stmt::StructDef { .. } | Stmt::EnumDef { .. } => Ok(()),
+        Stmt::StructDef { .. } | Stmt::EnumDef { .. } | Stmt::Loop { .. } => Ok(()),
+        Stmt::Break | Stmt::Continue => Ok(()),
         Stmt::If { condition, then_block, else_block } => {
             check_expr(condition, bindings, signatures, enum_variants)?;
             for s in then_block {

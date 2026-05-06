@@ -175,6 +175,11 @@ impl Parser {
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt, Diagnostic> {
+        if self.check(&Token::Semicolon) {
+            self.advance();
+            return self.parse_stmt();
+        }
+
         if self.check(&Token::Let) {
             self.advance();
             let name = self.expect_identifier("expected variable name after let")?;
@@ -203,6 +208,20 @@ impl Parser {
 
         if self.check(&Token::For) {
             return self.parse_for_stmt();
+        }
+
+        if self.check(&Token::Loop) {
+            return self.parse_loop_stmt();
+        }
+
+        if self.check(&Token::Break) {
+            self.advance();
+            return Ok(Stmt::Break);
+        }
+
+        if self.check(&Token::Continue) {
+            self.advance();
+            return Ok(Stmt::Continue);
         }
 
         if self.check(&Token::Match) {
@@ -327,6 +346,21 @@ impl Parser {
         Ok(Stmt::For { initializer, condition, increment, body })
     }
 
+    fn parse_loop_stmt(&mut self) -> Result<Stmt, Diagnostic> {
+        self.expect(Token::Loop, "expected `loop`")?;
+        self.expect(Token::LBrace, "expected `{`")?;
+        self.skip_newlines();
+
+        let mut body = Vec::new();
+        while !self.check(&Token::RBrace) && !self.is_at_end() {
+            body.push(self.parse_stmt()?);
+            self.skip_newlines();
+        }
+        self.expect(Token::RBrace, "expected `}`")?;
+
+        Ok(Stmt::Loop { body })
+    }
+
     fn parse_for_init(&mut self) -> Result<Stmt, Diagnostic> {
         if self.check(&Token::Let) {
             self.advance();
@@ -431,6 +465,24 @@ impl Parser {
     fn parse_primary(&mut self) -> Result<Expr, Diagnostic> {
         let current = self.peek();
         match &current.token {
+            Token::Minus => {
+                self.advance();
+                let next = self.peek();
+                match &next.token {
+                    Token::Number(n) => {
+                        let v = -*n;
+                        self.advance();
+                        Ok(Expr::Number(v))
+                    }
+                    _ => {
+                        return Err(Diagnostic::new(
+                            DiagnosticCode::ParseError,
+                            "expected expression",
+                            next.span,
+                        ));
+                    }
+                }
+            }
             Token::Number(v) => {
                 let v = *v;
                 self.advance();
@@ -442,7 +494,7 @@ impl Parser {
                 Ok(Expr::String(s))
             }
             Token::Identifier(name) => {
-                let mut name = name.clone();
+                let name = name.clone();
                 self.advance();
 
                 let mut base_expr = Expr::Identifier(name.clone());

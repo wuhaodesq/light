@@ -313,6 +313,18 @@ fn lower_stmt(stmt: &Stmt) -> String {
             out.push('}');
             out
         }
+        Stmt::Loop { body } => {
+            let mut out = "loop {\n".to_string();
+            for s in body {
+                out.push_str("  ");
+                out.push_str(&lower_stmt(s));
+                out.push('\n');
+            }
+            out.push('}');
+            out
+        }
+        Stmt::Break => "break".to_string(),
+        Stmt::Continue => "continue".to_string(),
     }
 }
 
@@ -347,7 +359,7 @@ fn lower_expr(expr: &Expr) -> String {
                         if patterns.is_empty() {
                             name.clone()
                         } else {
-                            format!("{}({})", name, patterns.iter().map(|p| "?".to_string()).collect::<Vec<_>>().join(", "))
+                            format!("{}({})", name, patterns.iter().map(|_p| "?".to_string()).collect::<Vec<_>>().join(", "))
                         }
                     }
                 };
